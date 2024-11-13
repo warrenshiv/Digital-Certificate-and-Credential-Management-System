@@ -7,183 +7,309 @@ module credentials::certifications {
     use sui::object::{Self, ID, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
+    use std::vector;
+    use std::option::{Self, Option};
 
-    // Error codes
-    const ENotAuthorized: u64 = 0;
-    const EInstitutionNotFound: u64 = 1;
-    const ECertificateNotFound: u64 = 2;
-    const EInvalidCredential: u64 = 3;
-    const EAlreadyVerified: u64 = 4;
-    const EExpiredCredential: u64 = 5;
+    // Additional error codes
+    const EInsufficientPoints: u64 = 6;
+    const EBadgeNotEarned: u64 = 7;
+    const EChallengeNotActive: u64 = 8;
+    const EPrerequisitesNotMet: u64 = 9;
+    const EInvalidEndorsement: u64 = 10;
 
-    // Core structs
-    struct Platform has key {
+    // Existing structs remain...
+    // Adding new structs for gamification
+
+    struct SkillTree has key {
         id: UID,
-        admin: address,
-        revenue: Balance<SUI>,
-        verification_fee: u64
+        skills: LinkedTable<String, Skill>,
+        prerequisites: LinkedTable<String, vector<String>>,
+        owner: address
     }
 
-    struct Institution has key {
+    struct Skill has store {
+        name: String,
+        level: u64,
+        experience: u64,
+        mastery_threshold: u64,
+        endorsements: vector<Endorsement>
+    }
+
+    struct Endorsement has store {
+        endorser: address,
+        weight: u64,
+        timestamp: u64,
+        notes: String
+    }
+
+    struct Achievement has key, store {
         id: UID,
         name: String,
-        address: address,
-        credentials: LinkedTable<String, Credential>,
-        reputation_score: u64,
-        verified: bool
-    }
-
-    struct Credential has key, store {
-        id: UID,
-        title: String,
         description: String,
-        issuer: address,
-        issue_date: u64,
-        expiry_date: Option<u64>,
-        metadata: LinkedTable<String, String>,
-        revoked: bool
+        points: u64,
+        rarity: u8, // 1: Common, 2: Rare, 3: Epic, 4: Legendary
+        requirements: vector<String>,
+        holders: vector<address>
     }
 
-    struct CredentialHolder has key {
+    struct Challenge has key {
         id: UID,
-        holder: address,
-        credentials: LinkedTable<String, Certificate>,
-        verifications: LinkedTable<String, Verification>
-    }
-
-    struct Certificate has key, store {
-        id: UID,
-        credential_id: ID,
-        holder: address,
-        issued_by: address,
-        issue_date: u64,
-        achievement_data: LinkedTable<String, String>
-    }
-
-    struct Verification has store {
-        verifier: address,
-        verification_date: u64,
-        valid_until: u64,
-        verification_notes: String
-    }
-
-    // Initialize platform
-    fun init(ctx: &mut TxContext) {
-        let platform = Platform {
-            id: object::new(ctx),
-            admin: tx_context::sender(ctx),
-            revenue: balance::zero(),
-            verification_fee: 100 // Base fee in SUI
-        };
-        transfer::share_object(platform);
-    }
-
-    // Register new institution
-    public fun register_institution(
-        platform: &Platform,
         name: String,
+        description: String,
+        start_time: u64,
+        end_time: u64,
+        required_credentials: vector<String>,
+        reward_points: u64,
+        participants: vector<address>,
+        completed_by: vector<address>
+    }
+
+    struct ReputationPoints has key {
+        id: UID,
+        holder: address,
+        total_points: u64,
+        point_history: LinkedTable<String, PointEntry>,
+        level: u64,
+        badges: vector<Badge>
+    }
+
+    struct PointEntry has store {
+        amount: u64,
+        source: String,
+        timestamp: u64,
+        category: String
+    }
+
+    struct Badge has store {
+        name: String,
+        category: String,
+        level: u8,
+        earned_date: u64,
+        special_privileges: vector<String>
+    }
+
+    struct LearningPath has key {
+        id: UID,
+        name: String,
+        description: String,
+        required_credentials: vector<String>,
+        milestones: LinkedTable<u64, Milestone>,
+        completion_reward: u64,
+        participants: vector<address>
+    }
+
+    struct Milestone has store {
+        description: String,
+        required_skills: vector<String>,
+        reward_points: u64,
+        completed_by: vector<address>
+    }
+
+    // New functions for enhanced features
+
+    public fun create_skill_tree(ctx: &mut TxContext) {
+        let skill_tree = SkillTree {
+            id: object::new(ctx),
+            skills: linked_table::new(ctx),
+            prerequisites: linked_table::new(ctx),
+            owner: tx_context::sender(ctx)
+        };
+        transfer::transfer(skill_tree, tx_context::sender(ctx));
+    }
+
+    public fun add_skill(
+        skill_tree: &mut SkillTree,
+        name: String,
+        mastery_threshold: u64,
+        prerequisites: vector<String>,
         ctx: &mut TxContext
     ) {
-        let institution = Institution {
+        assert!(skill_tree.owner == tx_context::sender(ctx), ENotAuthorized);
+        
+        let skill = Skill {
+            name: name,
+            level: 0,
+            experience: 0,
+            mastery_threshold,
+            endorsements: vector::empty()
+        };
+
+        linked_table::push_back(&mut skill_tree.skills, name, skill);
+        linked_table::push_back(&mut skill_tree.prerequisites, name, prerequisites);
+    }
+
+    public fun endorse_skill(
+        skill_tree: &mut SkillTree,
+        skill_name: String,
+        weight: u64,
+        notes: String,
+        ctx: &mut TxContext
+    ) {
+        let endorser = tx_context::sender(ctx);
+        assert!(endorser != skill_tree.owner, EInvalidEndorsement);
+        
+        let skill = linked_table::borrow_mut(&mut skill_tree.skills, skill_name);
+        let endorsement = Endorsement {
+            endorser,
+            weight,
+            timestamp: tx_context::epoch(ctx),
+            notes
+        };
+        vector::push_back(&mut skill.endorsements, endorsement);
+    }
+
+    public fun create_learning_path(
+        name: String,
+        description: String,
+        required_credentials: vector<String>,
+        completion_reward: u64,
+        ctx: &mut TxContext
+    ) {
+        let learning_path = LearningPath {
             id: object::new(ctx),
             name,
-            address: tx_context::sender(ctx),
-            credentials: linked_table::new(ctx),
-            reputation_score: 0,
-            verified: false
-        };
-        transfer::transfer(institution, tx_context::sender(ctx));
-    }
-
-    // Create new credential type
-    public fun create_credential(
-        institution: &mut Institution,
-        title: String,
-        description: String,
-        expiry_period: Option<u64>,
-        ctx: &mut TxContext
-    ) {
-        assert!(institution.address == tx_context::sender(ctx), ENotAuthorized);
-        
-        let credential = Credential {
-            id: object::new(ctx),
-            title,
             description,
-            issuer: institution.address,
-            issue_date: tx_context::epoch(ctx),
-            expiry_date: expiry_period,
-            metadata: linked_table::new(ctx),
-            revoked: false
+            required_credentials,
+            milestones: linked_table::new(ctx),
+            completion_reward,
+            participants: vector::empty()
         };
-
-        linked_table::push_back(&mut institution.credentials, title, credential);
+        transfer::share_object(learning_path);
     }
 
-    // Issue certificate to holder
-    public fun issue_certificate(
-        institution: &Institution,
-        credential_title: String,
-        holder_address: address,
-        achievement_data: LinkedTable<String, String>,
+    public fun add_milestone(
+        learning_path: &mut LearningPath,
+        milestone_number: u64,
+        description: String,
+        required_skills: vector<String>,
+        reward_points: u64,
         ctx: &mut TxContext
     ) {
-        assert!(institution.address == tx_context::sender(ctx), ENotAuthorized);
-        let credential = linked_table::borrow(&institution.credentials, credential_title);
-        
-        let certificate = Certificate {
+        let milestone = Milestone {
+            description,
+            required_skills,
+            reward_points,
+            completed_by: vector::empty()
+        };
+        linked_table::push_back(&mut learning_path.milestones, milestone_number, milestone);
+    }
+
+    public fun create_challenge(
+        name: String,
+        description: String,
+        start_time: u64,
+        end_time: u64,
+        required_credentials: vector<String>,
+        reward_points: u64,
+        ctx: &mut TxContext
+    ) {
+        let challenge = Challenge {
             id: object::new(ctx),
-            credential_id: object::id(credential),
-            holder: holder_address,
-            issued_by: institution.address,
-            issue_date: tx_context::epoch(ctx),
-            achievement_data
+            name,
+            description,
+            start_time,
+            end_time,
+            required_credentials,
+            reward_points,
+            participants: vector::empty(),
+            completed_by: vector::empty()
         };
-
-        // Transfer to holder
-        transfer::transfer(certificate, holder_address);
+        transfer::share_object(challenge);
     }
 
-    // Verify certificate
-    public fun verify_certificate(
-        platform: &mut Platform,
-        certificate: &Certificate,
-        notes: String,
-        valid_period: u64,
-        payment: Coin<SUI>,
+    public fun join_challenge(
+        challenge: &mut Challenge,
+        holder: &CredentialHolder,
         ctx: &mut TxContext
     ) {
-        let payment_value = coin::value(&payment);
-        assert!(payment_value >= platform.verification_fee, EInvalidCredential);
+        let participant = tx_context::sender(ctx);
+        assert!(tx_context::epoch(ctx) >= challenge.start_time, EChallengeNotActive);
+        assert!(tx_context::epoch(ctx) <= challenge.end_time, EChallengeNotActive);
         
-        let verification = Verification {
-            verifier: tx_context::sender(ctx),
-            verification_date: tx_context::epoch(ctx),
-            valid_until: tx_context::epoch(ctx) + valid_period,
-            verification_notes: notes
-        };
-
-        // Process payment
-        let payment_balance = coin::into_balance(payment);
-        balance::join(&mut platform.revenue, payment_balance);
-
-        // Store verification (would need to be adapted to actual implementation)
-        // This is simplified for demonstration
+        // Verify required credentials
+        // (Implementation would check credentials against requirements)
+        
+        vector::push_back(&mut challenge.participants, participant);
     }
 
-    // View certificate details
-    public fun view_certificate(certificate: &Certificate): (address, address, u64) {
-        (certificate.holder, certificate.issued_by, certificate.issue_date)
-    }
-
-    // Revoke credential
-    public fun revoke_credential(
-        institution: &mut Institution,
-        credential_title: String,
+    public fun complete_challenge(
+        challenge: &mut Challenge,
+        reputation: &mut ReputationPoints,
         ctx: &mut TxContext
     ) {
-        assert!(institution.address == tx_context::sender(ctx), ENotAuthorized);
-        let credential = linked_table::borrow_mut(&mut institution.credentials, credential_title);
-        credential.revoked = true;
+        let participant = tx_context::sender(ctx);
+        assert!(vector::contains(&challenge.participants, &participant), ENotAuthorized);
+        assert!(!vector::contains(&challenge.completed_by, &participant), EAlreadyVerified);
+        
+        // Add points to reputation
+        add_points(reputation, challenge.reward_points, b"Challenge Completion", ctx);
+        vector::push_back(&mut challenge.completed_by, participant);
+    }
+
+    public fun add_points(
+        reputation: &mut ReputationPoints,
+        amount: u64,
+        source: vector<u8>,
+        ctx: &mut TxContext
+    ) {
+        reputation.total_points = reputation.total_points + amount;
+        
+        // Update level based on points
+        reputation.level = calculate_level(reputation.total_points);
+        
+        let entry = PointEntry {
+            amount,
+            source: string::utf8(source),
+            timestamp: tx_context::epoch(ctx),
+            category: string::utf8(b"Achievement")
+        };
+        
+        linked_table::push_back(
+            &mut reputation.point_history,
+            string::utf8(source),
+            entry
+        );
+    }
+
+    fun calculate_level(points: u64): u64 {
+        // Example level calculation: level = sqrt(points/100)
+        // Simplified version:
+        points / 100 + 1
+    }
+
+    public fun award_badge(
+        reputation: &mut ReputationPoints,
+        name: String,
+        category: String,
+        level: u8,
+        privileges: vector<String>,
+        ctx: &mut TxContext
+    ) {
+        let badge = Badge {
+            name,
+            category,
+            level,
+            earned_date: tx_context::epoch(ctx),
+            special_privileges: privileges
+        };
+        vector::push_back(&mut reputation.badges, badge);
+    }
+
+    // Function to progress in learning path
+    public fun progress_learning_path(
+        learning_path: &mut LearningPath,
+        reputation: &mut ReputationPoints,
+        milestone_number: u64,
+        ctx: &mut TxContext
+    ) {
+        let participant = tx_context::sender(ctx);
+        let milestone = linked_table::borrow_mut(&mut learning_path.milestones, milestone_number);
+        
+        // Verify milestone requirements are met
+        // (Implementation would check skills and other requirements)
+        
+        vector::push_back(&mut milestone.completed_by, participant);
+        add_points(reputation, milestone.reward_points, b"Learning Path Progress", ctx);
     }
 
     #[test_only]
