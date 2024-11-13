@@ -1,100 +1,234 @@
-# Stim Games Platform: Module Documentation
+# Digital Certificates and Credentialing System
 
-## Overview
+A blockchain-based certification and credentialing system built on the Sui network, featuring gamification, skill progression, and verifiable achievements.
 
-This module, `stim_games::stim_games`, establishes a decentralized game store, enabling publishers to sell game licenses and users to buy, store, and view their purchased licenses. Additional features like promo codes, fee management, and a licensing verification mechanism are built in, providing a comprehensive structure for managing a blockchain-based game store.
+## 🌟 Features
 
-### Components
+### Core Certification Features
+- **Digital Certificates**: Issue and manage verifiable digital certificates
+- **Institutional Verification**: Multi-party verification system for credentials
+- **Time-based Validity**: Support for expiration dates and renewal periods
+- **Reputation System**: Track and manage institutional credibility
 
-#### Struct Definitions
+### Gamification & Progression
+- **Skill Trees**: Hierarchical skill progression with peer endorsements
+- **Achievement System**: Multi-tiered achievements with rarity levels
+- **Challenge System**: Time-limited challenges with rewards
+- **Learning Paths**: Structured progression routes with milestones
+- **Points & Reputation**: Comprehensive point system with history tracking
+- **Badge System**: Tiered badges with special privileges
 
-1. **Platform**: Represents the game platform, with attributes for owner, fee percentage, and accumulated revenue.
+## 📋 Prerequisites
 
-2. **GameStore**: A container for games and promotional codes, with features for owner management.
+- Sui CLI installed
+- Move language knowledge
+- Node.js >= 14.0.0
+- Rust >= 1.60.0
 
-3. **Game**: Contains details of a game, including name, publisher, price, revenue, and a list of issued licenses.
+## 🚀 Quick Start
 
-4. **UserAccount**: Manages user-specific information such as balance and owned licenses.
+1. Clone the repository
+```bash
+git clone https://github.com/yourusername/digital-certificates.git
+cd digital-certificates
+```
 
-5. **License**: Represents ownership of a purchased game, with details like purchase date and gifting information.
+2. Install dependencies
+```bash
+sui move install
+```
 
-6. **Discount**: Details for promotional codes, including discount rate, expiry, and usage tracking.
+3. Build the project
+```bash
+sui move build
+```
 
-#### Error Codes
+4. Deploy to network
+```bash
+sui client publish --gas-budget 20000000
+```
 
-- **ENotOwner (0)**: Triggered when an action is attempted by a non-owner.
-- **EGameNotFound (1)**: Raised if a game is not found in the store.
-- **EUserNotFound (2)**: Raised when a user account is not found.
-- **EInsufficientFunds (3)**: Raised if the user lacks enough funds to purchase a license.
-- **EGameAlreadyExists (4)**: Raised when trying to add a game that already exists.
-- **EGameSoldOut (5)**: Raised when a game reaches its maximum licenses.
-- **EInvalidPromoCode (6)**: Raised if a promo code is invalid or expired.
+## 💡 Usage Examples
 
----
+### Creating an Institution
+```move
+// Register a new educational institution
+public fun register_institution(
+    platform: &Platform,
+    name: String,
+    ctx: &mut TxContext
+)
+```
 
-### Functions
+### Issuing Certificates
+```move
+// Issue a new certificate to a holder
+public fun issue_certificate(
+    institution: &Institution,
+    credential_title: String,
+    holder_address: address,
+    achievement_data: LinkedTable<String, String>,
+    ctx: &mut TxContext
+)
+```
 
-#### Platform and Store Management
+### Managing Learning Paths
+```move
+// Create a new learning path
+public fun create_learning_path(
+    name: String,
+    description: String,
+    required_credentials: vector<String>,
+    completion_reward: u64,
+    ctx: &mut TxContext
+)
+```
 
-- **initialize_platform**: Initializes the platform with a set fee percentage for transactions. Only the platform owner can use this.
-  
-- **create_store**: Creates a game store for managing games and promotional codes. The sender of the transaction becomes the store owner.
+## 🏗 Architecture
 
-#### User Account Management
+### Core Components
 
-- **create_user_account**: Sets up a new user account for purchasing licenses.
+1. **Platform**
+   - System administration
+   - Fee management
+   - Global settings
 
-#### Game Management
+2. **Institution**
+   - Credential management
+   - Certificate issuance
+   - Reputation tracking
 
-- **add_game**: Allows store owners to add new games, specifying name, price, description, and optional max licenses.
+3. **Credentials**
+   - Certificate templates
+   - Validation rules
+   - Metadata management
 
-- **add_promo_code**: Enables store owners to add promotional codes with defined discounts and usage restrictions.
+4. **Gamification Components**
+   - Skill Trees
+   - Achievements
+   - Challenges
+   - Learning Paths
+   - Points System
+   - Badges
 
-#### License Purchase and Payment
+## 📊 Data Structures
 
-- **purchase_license**: Manages the purchase of a game license, including promo code application, fund deduction, platform fees, and license issuance. Licenses are only issued if sufficient funds are available, and the game is not sold out.
+### Main Structs
+```move
+struct Platform has key {
+    id: UID,
+    admin: address,
+    revenue: Balance<SUI>,
+    verification_fee: u64
+}
 
-#### User Interaction
+struct Institution has key {
+    id: UID,
+    name: String,
+    address: address,
+    credentials: LinkedTable<String, Credential>,
+    reputation_score: u64,
+    verified: bool
+}
 
-- **view_user_licenses**: Lists all licenses owned by the user.
+struct SkillTree has key {
+    id: UID,
+    skills: LinkedTable<String, Skill>,
+    prerequisites: LinkedTable<String, vector<String>>,
+    owner: address
+}
+```
 
-- **view_license**: Provides details of a specific license owned by the user.
+## 🔐 Security
 
-#### Game Catalog
+### Key Security Features
+- Multi-party verification
+- Time-locked credentials
+- Revocation system
+- Endorsement validation
+- Access control mechanisms
 
-- **view_game_catalog**: Displays all games available for purchase. Filters out sold-out games if `max_licenses` is defined.
+### Best Practices
+1. Always verify institutional authority
+2. Implement proper access controls
+3. Validate all credential requirements
+4. Maintain audit trails
+5. Use secure endorsement mechanisms
 
-#### License Verification and Revenue Withdrawal
+## 🛣 Roadmap
 
-- **verify_license**: Allows for the verification of a user’s license by the license holder.
+### Phase 1: Core Features
+- [x] Basic certification system
+- [x] Institutional management
+- [x] Verification system
 
-- **withdraw_revenue**: Enables the game publisher to withdraw accumulated revenue for a particular game.
+### Phase 2: Gamification
+- [x] Skill trees
+- [x] Achievement system
+- [x] Challenge system
+- [x] Learning paths
 
----
+### Phase 3: Future Enhancements
+- [ ] AI-powered skill validation
+- [ ] Cross-chain certification
+- [ ] Advanced analytics
+- [ ] Mobile application
+- [ ] Integration APIs
 
-### How to Use
+## 🤝 Contributing
 
-1. **Initialize Platform**: Set up the platform with a fee percentage, enabling revenue collection for game sales.
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-2. **Create Store**: Owners create a store, which will manage the available games and promotional codes.
+## 📜 License
 
-3. **Add Games and Promo Codes**: Owners add games with prices and descriptions. Promo codes may be added to incentivize purchases.
+This project is licensed under the MIT License - see the LICENSE.md file for details
 
-4. **User Registration**: Users create accounts to track their purchases and manage licenses.
+## 🙏 Acknowledgments
 
-5. **Purchasing and Licensing**: Users purchase licenses, with promo codes if available. Platform fees are automatically deducted and transferred to the platform’s revenue.
+- Sui Move Team
+- Digital Credentials Consortium
+- Open Badge Standard
+- Educational Technology Community
 
-6. **License Verification**: Purchased licenses can be verified by the owner and store, ensuring authenticity and preventing unauthorized transfers.
+## 📞 Contact
 
-### Key Features
+- **Project Maintainer**: [Your Name]
+- **Email**: [your.email@example.com]
+- **Twitter**: [@yourhandle]
+- **Discord**: [Your Discord Server]
 
-- **Decentralized Ownership**: Owners have full control over store creation, game additions, and revenue withdrawal.
-- **Promotional Code System**: Promo codes offer users discounts, which store owners can configure with usage limits and expiration.
-- **Revenue Collection and Fee Management**: Platform fees are automatically collected on each purchase, providing a steady revenue stream for the platform.
-- **License Verification**: Verifiable licenses increase transparency and trust, ensuring that only legitimate users access purchased content.
+## 🐛 Known Issues
 
-**Dependencies:**
+1. Skill tree validation can be resource-intensive
+2. Challenge completion verification needs optimization
+3. Endorsement weight calculation needs refinement
 
-- This module requires the `sui` and `candid` crates for Sui blockchain interaction and data serialization.
+## 🔧 Troubleshooting
 
-get more info at [dacade](https://dacade.org/communities/sui/challenges/19885730-fb83-477a-b95b-4ab265b61438/learning-modules/fc2e67a1-520d-4fae-a318-38414babc803)
+### Common Issues
+
+1. **Transaction Failures**
+   - Check gas budget
+   - Verify proper permissions
+   - Validate prerequisites
+
+2. **Verification Errors**
+   - Confirm institution authority
+   - Check credential expiration
+   - Verify endorsement validity
+
+3. **Points System Issues**
+   - Validate point calculations
+   - Check milestone completion
+   - Verify challenge participation
+
+## 📚 Additional Resources
+
+- [Sui Documentation](https://docs.sui.io/)
+- [Move Language Book](https://move-language.github.io/move/)
+- [Digital Credentials Documentation](https://www.w3.org/TR/vc-data-model/)
+- [Project Wiki](link-to-your-wiki)
